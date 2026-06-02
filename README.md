@@ -6,3 +6,6 @@ A web-app that will
   c) (will be added later) incoperate astrology reading with your saju results to
       give you a fun experience looking what each says about you. Differences and similarities etc.
       
+run by:
+cd web
+npm run dev
