@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import {
+  BIRTH_PLACE_PRESETS,
+  HOUSE_SYSTEMS,
+  type NatalChartSummary,
+} from "@/lib/natal-chart";
 import {
   ELEMENT_NAMES,
   ELEMENT_ORDER,
@@ -79,6 +84,7 @@ type ApiOk = {
       };
     };
     ohangBalance?: OhangBalance;
+    natalChart?: NatalChartSummary;
     korean?: {
       headline: string;
       tlDr: string[];
@@ -252,6 +258,89 @@ function ManseryeokGrid({
   );
 }
 
+function NatalChartPanel({
+  chart,
+  language,
+}: {
+  chart: NatalChartSummary;
+  language: "english" | "korean";
+}) {
+  const lang = language;
+  const houseLabel = HOUSE_SYSTEMS.find((h) => h.value === chart.houseSystem)?.label ?? chart.houseSystem;
+
+  return (
+    <div className="rounded-2xl border border-black/10 bg-white p-4 dark:border-white/15 dark:bg-black">
+      <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        {lang === "korean" ? "서양 점성술 · 출생 차트" : "Western natal chart"}
+      </div>
+      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+        {chart.birthPlaceLabel ? `${chart.birthPlaceLabel} · ` : ""}
+        {chart.latitude.toFixed(2)}°, {chart.longitude.toFixed(2)}° · {houseLabel} · {chart.zodiac}
+      </p>
+      {chart.notes ? (
+        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">{chart.notes}</p>
+      ) : null}
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm dark:border-white/10 dark:bg-white/5">
+          <div className="text-xs text-zinc-500">{lang === "korean" ? "태양 별자리" : "Sun sign"}</div>
+          <div className="mt-1 font-semibold">{chart.sunSign}</div>
+        </div>
+        <div className="rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm dark:border-white/10 dark:bg-white/5">
+          <div className="text-xs text-zinc-500">{lang === "korean" ? "상승궁 (ASC)" : "Rising (ASC)"}</div>
+          <div className="mt-1 font-semibold">
+            {chart.ascendant.sign} {chart.ascendant.degree}
+          </div>
+        </div>
+        <div className="rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm dark:border-white/10 dark:bg-white/5">
+          <div className="text-xs text-zinc-500">{lang === "korean" ? "MC (천정)" : "Midheaven (MC)"}</div>
+          <div className="mt-1 font-semibold">
+            {chart.midheaven.sign} {chart.midheaven.degree}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[420px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-black/10 text-xs text-zinc-500 dark:border-white/10">
+              <th className="py-2 pr-2">{lang === "korean" ? "행성" : "Planet"}</th>
+              <th className="py-2 pr-2">{lang === "korean" ? "별자리" : "Sign"}</th>
+              <th className="py-2 pr-2">{lang === "korean" ? "도수" : "Degree"}</th>
+              <th className="py-2 pr-2">{lang === "korean" ? "하우스" : "House"}</th>
+              <th className="py-2">{lang === "korean" ? "역행" : "Rx"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...chart.planets, ...chart.points].map((p) => (
+              <tr key={p.key} className="border-b border-black/5 dark:border-white/5">
+                <td className="py-2 pr-2 font-medium">{p.label}</td>
+                <td className="py-2 pr-2">{p.sign}</td>
+                <td className="py-2 pr-2">{p.degree}</td>
+                <td className="py-2 pr-2">{p.house ?? "—"}</td>
+                <td className="py-2">{p.retrograde ? "℞" : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <details className="mt-4">
+        <summary className="cursor-pointer text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          {lang === "korean" ? "하우스 커스프 (12)" : "House cusps (12)"}
+        </summary>
+        <div className="mt-2 grid gap-1 text-xs text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
+          {chart.houses.map((h) => (
+            <div key={h.number}>
+              {h.label}: {h.sign} {h.degree}
+            </div>
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function OhangBalancePanel({
   balance,
   language,
@@ -415,9 +504,33 @@ function Md({ text }: { text: string }) {
   );
 }
 
-function getTimeZones(): string[] {
-  // Modern browsers (Chromium/Firefox/Safari 17+) support this.
-  const supportedValuesOf = (Intl as any)?.supportedValuesOf as undefined | ((key: string) => string[]);
+const COMMON_TIME_ZONES = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "Africa/Johannesburg",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Bangkok",
+  "Asia/Singapore",
+  "Asia/Shanghai",
+  "Asia/Taipei",
+  "Asia/Tokyo",
+  "Asia/Seoul",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+];
+
+function getBrowserTimeZones(): string[] {
+  const supportedValuesOf = (Intl as { supportedValuesOf?: (key: string) => string[] })
+    .supportedValuesOf;
   if (supportedValuesOf) {
     try {
       const tzs = supportedValuesOf("timeZone");
@@ -426,62 +539,54 @@ function getTimeZones(): string[] {
       // ignore
     }
   }
-
-  // Fallback: common zones (covers most users).
-  return [
-    "UTC",
-    "America/Los_Angeles",
-    "America/Denver",
-    "America/Chicago",
-    "America/New_York",
-    "America/Sao_Paulo",
-    "Europe/London",
-    "Europe/Paris",
-    "Europe/Berlin",
-    "Europe/Moscow",
-    "Africa/Johannesburg",
-    "Asia/Dubai",
-    "Asia/Kolkata",
-    "Asia/Bangkok",
-    "Asia/Singapore",
-    "Asia/Shanghai",
-    "Asia/Taipei",
-    "Asia/Tokyo",
-    "Asia/Seoul",
-    "Australia/Sydney",
-    "Pacific/Auckland",
-  ];
+  return COMMON_TIME_ZONES;
 }
 
 export default function Home() {
+  const defaultPlace = BIRTH_PLACE_PRESETS[0];
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [timezone, setTimezone] = useState("");
   const [sex, setSex] = useState<"female" | "male" | "other">("female");
   const [detail, setDetail] = useState<Detail>("simple");
   const [language, setLanguage] = useState<"english" | "korean">("english");
+  const [includeAstrology, setIncludeAstrology] = useState(true);
+  const [birthPlaceId, setBirthPlaceId] = useState<string>(defaultPlace.id);
+  const [latitude, setLatitude] = useState(String(defaultPlace.latitude));
+  const [longitude, setLongitude] = useState(String(defaultPlace.longitude));
+  const [houseSystem, setHouseSystem] = useState(HOUSE_SYSTEMS[0].value);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiOk | null>(null);
 
-  const guessedTz = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-    } catch {
-      return "";
-    }
-  }, []);
-
-  const timeZones = useMemo(() => getTimeZones(), []);
+  // SSR and first client paint use the static list; full IANA list + guessed zone load after mount
+  // so server HTML matches hydration (Intl differs between Node and the browser).
+  const [timeZones, setTimeZones] = useState(COMMON_TIME_ZONES);
+  const [guessedTz, setGuessedTz] = useState("");
 
   useEffect(() => {
-    // Make timezone “actually work” by defaulting to a real IANA zone immediately.
-    if (!timezone && guessedTz) setTimezone(guessedTz);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guessedTz]);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      setGuessedTz(tz);
+      if (tz) setTimezone((prev) => prev || tz);
+    } catch {
+      // ignore
+    }
+    setTimeZones(getBrowserTimeZones());
+  }, []);
 
   const tzValue = timezone || guessedTz;
+
+  function onBirthPlaceChange(id: string) {
+    setBirthPlaceId(id);
+    if (id === "custom") return;
+    const preset = BIRTH_PLACE_PRESETS.find((p) => p.id === id);
+    if (preset) {
+      setLatitude(String(preset.latitude));
+      setLongitude(String(preset.longitude));
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -498,6 +603,14 @@ export default function Home() {
           timezone: tzValue,
           sex,
           detail,
+          includeAstrology,
+          latitude: includeAstrology ? Number(latitude) : undefined,
+          longitude: includeAstrology ? Number(longitude) : undefined,
+          birthPlaceLabel:
+            birthPlaceId === "custom"
+              ? undefined
+              : BIRTH_PLACE_PRESETS.find((p) => p.id === birthPlaceId)?.label,
+          houseSystem,
         }),
       });
 
@@ -515,9 +628,9 @@ export default function Home() {
     <div className="min-h-full bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Saju → English / Korean</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Saju + Astrology</h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            Enter birth info, then get a structured explanation in English or Korean.
+            Four Pillars (사주) and Western natal chart together — explained in English or Korean.
           </p>
         </div>
 
@@ -566,6 +679,88 @@ export default function Home() {
                   <span className="font-medium">{guessedTz || "unknown"}</span>
                 </div>
               </label>
+
+              <div className="rounded-xl border border-black/10 bg-zinc-50 p-3 dark:border-white/15 dark:bg-black">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={includeAstrology}
+                    onChange={(e) => setIncludeAstrology(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300"
+                  />
+                  <span className="font-medium">Include Western natal chart (astrology)</span>
+                </label>
+                {includeAstrology ? (
+                  <div className="mt-3 flex flex-col gap-3">
+                    <label className="flex flex-col gap-2">
+                      <FieldLabel>Birth place</FieldLabel>
+                      <select
+                        className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-black/10 dark:border-white/15 dark:bg-black dark:focus:ring-white/15"
+                        value={birthPlaceId}
+                        onChange={(e) => onBirthPlaceChange(e.target.value)}
+                      >
+                        {BIRTH_PLACE_PRESETS.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                        <option value="custom">Custom coordinates</option>
+                      </select>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex flex-col gap-2">
+                        <FieldLabel>Latitude</FieldLabel>
+                        <input
+                          className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-black/10 dark:border-white/15 dark:bg-black dark:focus:ring-white/15"
+                          type="number"
+                          step="any"
+                          min={-90}
+                          max={90}
+                          value={latitude}
+                          onChange={(e) => {
+                            setBirthPlaceId("custom");
+                            setLatitude(e.target.value);
+                          }}
+                          required={includeAstrology}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2">
+                        <FieldLabel>Longitude</FieldLabel>
+                        <input
+                          className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-black/10 dark:border-white/15 dark:bg-black dark:focus:ring-white/15"
+                          type="number"
+                          step="any"
+                          min={-180}
+                          max={180}
+                          value={longitude}
+                          onChange={(e) => {
+                            setBirthPlaceId("custom");
+                            setLongitude(e.target.value);
+                          }}
+                          required={includeAstrology}
+                        />
+                      </label>
+                    </div>
+                    <label className="flex flex-col gap-2">
+                      <FieldLabel>House system</FieldLabel>
+                      <select
+                        className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-black/10 dark:border-white/15 dark:bg-black dark:focus:ring-white/15"
+                        value={houseSystem}
+                        onChange={(e) => setHouseSystem(e.target.value as typeof houseSystem)}
+                      >
+                        {HOUSE_SYSTEMS.map((h) => (
+                          <option key={h.value} value={h.value}>
+                            {h.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Birth time should be local time at the birth place. Accurate lat/long matters for Ascendant and houses.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-2">
@@ -706,6 +901,10 @@ export default function Home() {
 
                 {data.result.ohangBalance ? (
                   <OhangBalancePanel balance={data.result.ohangBalance} language={language} />
+                ) : null}
+
+                {data.result.natalChart ? (
+                  <NatalChartPanel chart={data.result.natalChart} language={language} />
                 ) : null}
 
                 {language === "english" && data.result.englishSummary ? (

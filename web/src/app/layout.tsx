@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Saju → English",
-  description: "Translate and explain 사주 results in clear English.",
+  title: "Saju + Astrology",
+  description: "Four Pillars (사주) and Western natal chart readings in clear English or Korean.",
 };
 
 export default function RootLayout({
